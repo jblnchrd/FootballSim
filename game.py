@@ -1,10 +1,15 @@
 import random as rand
 import numpy as np
+import time
 
 class game(object):
     def __init__(self, home_team, away_team):
         self.home_team = home_team
         self.away_team = away_team
+        self.home_score = 0
+        self.away_score = 0
+        self.home_total_score = 0
+        self.away_total_score = 0
         self.yard_line = 25
         self.down = 1
         self.to_go = 10
@@ -26,7 +31,6 @@ class game(object):
     def set_strat(self):
         #late game behind by more than a field goal
         self.lead = self.has_ball.score - self.defense.score
-        print("Lead: {}".format(self.lead))
         if self.time <= 4*60.:
             if self.lead <= -4:
                 self.strategy = "aggressive"
@@ -41,10 +45,11 @@ class game(object):
                 self.strategy = "conservative"
 
         elif self.time > 4*60.:
-            if self.lead >= 0:
+            if self.lead <= -17:
+                self.strategy = "comeback"
+            elif self.lead >= 0:
                 self.strategy = "conservative"
-            elif self.lead <= -17:
-                return "comeback"
+
         #else:
             #self.strategy = "conservative"
 
@@ -152,7 +157,7 @@ class game(object):
         self.print_status()
         print("\n")
         self.plays[play_type]()
-        self.has_ball.total_yards = self.has_ball.pass_yards + self.has_ball.rush_yards
+        self.has_ball.total_yards += self.has_ball.pass_yards + self.has_ball.rush_yards
 
         if self.game_state != "punt" and self.game_state != "field goal":
             self.has_ball.play_count += 1
@@ -189,9 +194,23 @@ class game(object):
                 self.change_poss(yard_line=25)
             else:
                 self.change_poss(yard_line=(100 - self.yard_line + rand.randint(0, 19)))
-
-        elif (rand.random() - self.has_ball.momentum) < ((self.has_ball.comp_percentage + self.defense.comp_defense) / 2):
-            off = 0.5*np.random.gamma(self.has_ball.ypPass, 3.)
+        if self.down == 3:
+            # average together third down efficiency and third down defense and add this to determination
+            if (rand.random() - self.has_ball.momentum) < ((self.has_ball.comp_percentage + self.defense.comp_defense +
+                                                           self.has_ball.third_down + self.defense.third_down_def) / 4):
+                off = 0.5 * np.random.gamma(self.has_ball.ypPass, 3.5)
+                defense = 0.5 * np.random.gamma(self.defense.ypPass_def, 0.9)
+                yards_gained = int((off + defense) / 2)
+                print("Pass completed for a gain of {} yards.".format(yards_gained))
+                self.game_state = "pass complete"
+                self.yard_line += yards_gained
+                self.has_ball.completions += 1
+                self.has_ball.pass_yards += yards_gained
+                self.has_ball.momentum += .001
+                if yards_gained > 15:
+                    self.has_ball.momentum += .003
+        elif self.down < 3 and (rand.random() - self.has_ball.momentum) < ((self.has_ball.comp_percentage + self.defense.comp_defense) / 2):
+            off = 0.5*np.random.gamma(self.has_ball.ypPass, 3.5)
             defense = 0.5 * np.random.gamma(self.defense.ypPass_def, 1)
             yards_gained = int((off + defense) / 2)
             print("Pass completed for a gain of {} yards.".format(yards_gained))
@@ -228,7 +247,6 @@ class game(object):
         self.down = 1
         self.marker = self.yard_line + 10
         self.to_go = 10
-        print("First Down!")
 
     def change_poss(self, on_downs=False, yard_line=25):
         if on_downs:
@@ -277,8 +295,21 @@ class game(object):
             self.plays['rush']()
 
     def run_game(self):
+        rand.seed(time.time)
+        self.time = 40*60.
         while self.time > 0:
             self.run_play()
+
+    def run_games(self, num_games):
+        for i in range(num_games):
+            self.home_team.clear_stats()
+            self.away_team.clear_stats()
+            self.run_game()
+            self.home_team.set_totals(self.home_team.score, self.home_team.pass_yards, self.home_team.rush_yards)
+            self.away_team.set_totals(self.away_team.score, self.away_team.pass_yards, self.away_team.rush_yards)
+
+        self.home_team.set_averages(num_games)
+        self.away_team.set_averages(num_games)
 
     def print_score(self):
         print('{}: {}\n{}:{}\n'.format(self.home_team.name, self.home_team.score, self.away_team.name, self.away_team.score))
