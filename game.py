@@ -3,9 +3,13 @@ import numpy as np
 import time
 
 class game(object):
-    def __init__(self, home_team, away_team):
+    def __init__(self, home_team, away_team, pause=0, prints=True):
         self.home_team = home_team
         self.away_team = away_team
+        self.pause = pause
+        self.prints = prints
+        self.home_team.home = True
+        self.away_team.home = False
         self.home_score = 0
         self.away_score = 0
         self.home_total_score = 0
@@ -104,17 +108,19 @@ class game(object):
             if self.situation == "long yardage" or self.situation == "third and long":
                 return "pass"
             else:
-                return "pass"
+                return "run or pass"
 
     def check_td(self):
         if self.yard_line >= 100:
             self.game_state = "touchdown"
-            print("Touchdown {}".format(self.has_ball.name))
+            if self.prints:
+                print("Touchdown {}".format(self.has_ball.name))
             self.has_ball.score += 7
             self.has_ball.momentum += 0.0075
             self.defense.momentum -= 0.005
             self.change_poss()
-            self.print_score()
+            if self.prints:
+                self.print_score()
 
     def check_turnover_on_downs(self):
         if self.down > 4:
@@ -154,8 +160,9 @@ class game(object):
         self.set_strat()
         self.situation = self.set_situation()
         play_type = self.determine_play()
-        self.print_status()
-        print("\n")
+        if self.prints:
+            self.print_status()
+            #print("\n")
         self.plays[play_type]()
         self.has_ball.total_yards += self.has_ball.pass_yards + self.has_ball.rush_yards
 
@@ -169,12 +176,13 @@ class game(object):
 
     def rush_play(self):
         rush = np.random.gamma(self.has_ball.ypRush + self.has_ball.momentum, 2.)
-        allowed = np.random.gamma(self.defense.ypRush_def, 1.)
+        allowed = np.random.gamma(self.defense.ypRush_def, 1.5)
         yards_gained = int((rush + allowed) / 2)
         yards_gained = int(yards_gained)
         self.yard_line += yards_gained
         self.game_state = "rush"
-        print("Rush for a gain of {} yards.".format(yards_gained))
+        if self.prints:
+            print("Rush for a gain of {} yards.".format(yards_gained))
         self.has_ball.rush_yards += yards_gained
         self.has_ball.rush_plays += 1
         if yards_gained > 10:
@@ -186,7 +194,8 @@ class game(object):
         #determine if interception.
         pick_det = rand.random()
         if pick_det < self.has_ball.interception:
-            print("INTERCEPTION!")
+            if self.prints:
+                print("INTERCEPTION!")
             self.has_ball.momentum -= .007
             self.defense.momentum += 0.09
             self.turnovers += 1
@@ -199,9 +208,10 @@ class game(object):
             if (rand.random() - self.has_ball.momentum) < ((self.has_ball.comp_percentage + self.defense.comp_defense +
                                                            self.has_ball.third_down + self.defense.third_down_def) / 4):
                 off = 0.5 * np.random.gamma(self.has_ball.ypPass, 3.5)
-                defense = 0.5 * np.random.gamma(self.defense.ypPass_def, 0.9)
+                defense = 0.5 * np.random.gamma(self.defense.ypPass_def, 1.1)
                 yards_gained = int((off + defense) / 2)
-                print("Pass completed for a gain of {} yards.".format(yards_gained))
+                if self.prints:
+                    print("Pass completed for a gain of {} yards.".format(yards_gained))
                 self.game_state = "pass complete"
                 self.yard_line += yards_gained
                 self.has_ball.completions += 1
@@ -209,11 +219,13 @@ class game(object):
                 self.has_ball.momentum += .001
                 if yards_gained > 15:
                     self.has_ball.momentum += .003
-        elif self.down < 3 and (rand.random() - self.has_ball.momentum) < ((self.has_ball.comp_percentage + self.defense.comp_defense) / 2):
-            off = 0.5*np.random.gamma(self.has_ball.ypPass, 3.5)
-            defense = 0.5 * np.random.gamma(self.defense.ypPass_def, 1)
+        elif self.down < 3 and (np.random.normal(self.has_ball.comp_percentage) - self.has_ball.momentum) < (
+                (self.has_ball.comp_percentage + self.defense.comp_defense) / 2):
+            off = 0.5 * np.random.gamma(self.has_ball.ypPass, 3.3)
+            defense = 0.5 * np.random.gamma(self.defense.ypPass_def, 1.1)
             yards_gained = int((off + defense) / 2)
-            print("Pass completed for a gain of {} yards.".format(yards_gained))
+            if self.prints:
+                print("Pass completed for a gain of {} yards.".format(yards_gained))
             self.game_state = "pass complete"
             self.yard_line += yards_gained
             self.has_ball.completions += 1
@@ -223,7 +235,8 @@ class game(object):
                 self.has_ball.momentum += .003
 
         else:
-            print("incomplete pass")
+            if self.prints:
+                print("incomplete pass")
             self.game_state = "pass incomplete"
             self.has_ball.incompletions += 1
             self.has_ball.momentum -= .001
@@ -231,16 +244,18 @@ class game(object):
 
     def field_goal(self):
         det = rand.uniform(0, 1)
-        if det > 0.05:
+        if det < self.yard_line / 100:
             self.has_ball.score += 3
-            print("Field goal is good!")
-            self.print_score()
+            if self.prints:
+                print("Field goal is good!")
+                self.print_score()
             self.has_ball.momentum += 0.005
             self.change_poss()
         else:
-            print("Field goal is no good!")
+            if self.prints:
+                print("Field goal is no good!")
+                self.print_score()
             self.change_poss(on_downs=True)
-            self.print_score()
         self.game_state = "field goal"
 
     def first_down(self):
@@ -279,10 +294,12 @@ class game(object):
         if self.yard_line + punt_len >= 100:
             self.has_ball.momentum -= 0.005
             self.change_poss()
-            print("Punt for a touchback!")
+            if self.prints:
+                print("Punt for a touchback!")
         else:
             yard = 100 - (self.yard_line + punt_len)
-            print("Punt (no touchback)")
+            if self.prints:
+                print("Punt (no touchback)")
             self.has_ball.momentum -= 0.005
             self.change_poss(yard_line=yard)
         self.game_state = "punt"
@@ -297,8 +314,11 @@ class game(object):
     def run_game(self):
         rand.seed(time.time)
         self.time = 40*60.
+        self.yard_line = 25
         while self.time > 0:
             self.run_play()
+            if self.pause > 0:
+                time.sleep(self.pause)
 
     def run_games(self, num_games):
         for i in range(num_games):
@@ -320,8 +340,8 @@ class game(object):
         print('Ball at the {} yard line'.format(self.yard_line))
         print('{} seconds remaining'.format(self.time))
         print('{}: {}\n{}:{}\n'.format(self.home_team.name, self.home_team.score, self.away_team.name, self.away_team.score))
-        print("Momentum for {}: {}".format(self.has_ball.name, self.has_ball.momentum))
-        print("Strategy: {}*******Situation:{}".format(self.strategy, self.situation))
+        #print("Momentum for {}: {}".format(self.has_ball.name, self.has_ball.momentum))
+        #print("Strategy: {}*******Situation:{}".format(self.strategy, self.situation))
 
     def print_stats(self, team):
         print("{}".format(team.name))

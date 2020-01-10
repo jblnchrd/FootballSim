@@ -2,7 +2,7 @@
 import numpy as np
 
 class team(object):
-    def __init__(self, name, offense, defense, eff, tendency, comp, turnover, home=False):
+    def __init__(self, name, offense, defense, eff, tendency, comp, turnover, dvoa, home=False):
         self.name = name
         self.score = 0
         self.total_yards = 0
@@ -13,28 +13,33 @@ class team(object):
         self.average_score = 0
         self.average_pass = 0
         self.average_rush = 0
-        if home:
-            self.ypPass = offense[0] + 0.1
-            self.ypRush = offense[1] + 0.1
-            self.ypPass_def = defense[0] - 0.15
-            self.ypRush_def = defense[1] - 0.15
+        self.home = home
+        if self.home:
+            self.ypPass = offense[0] + 0.1 + (dvoa[0] / 20)
+            self.ypRush = offense[1] + 0.1 + (dvoa[0] / 10)
+            self.ypPass_def = defense[0] - 0.15 - (dvoa[1] / 20)
+            self.ypRush_def = defense[1] - 0.15 - (dvoa[1] / 10)
             self.third_down = eff[0]
             self.third_down_def = eff[1]
             self.pass_tend = tendency[0]
             self.run_percentage = tendency[1]
             self.comp_percentage = comp[0]
             self.comp_defense = comp[1]
+            self.off_dvoa = dvoa[0]
+            self.def_dvoa = dvoa[1]
         else:
-            self.ypPass = offense[0]
-            self.ypRush = offense[1]
-            self.ypPass_def = defense[0]
-            self.ypRush_def = defense[1]
+            self.ypPass = offense[0] + (dvoa[0] / 22)
+            self.ypRush = offense[1] + (dvoa[0] / 12)
+            self.ypPass_def = defense[0] - (dvoa[1] / 22)
+            self.ypRush_def = defense[1] - (dvoa[1] / 12)
             self.third_down = eff[0]
             self.third_down_def = eff[1]
             self.pass_tend = tendency[0]
             self.run_percentage = tendency[1]
             self.comp_percentage = comp[0]
             self.comp_defense = comp[1]
+            self.off_dvoa = dvoa[0]
+            self.def_dvoa = dvoa[1]
         #stats
         self.momentum = 0.0
         self.play_count = 0
